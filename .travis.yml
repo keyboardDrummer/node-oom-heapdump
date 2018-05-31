@@ -46,7 +46,7 @@ install:
   # Ensure source install works and compiles correctly
   - npm install --build-from-source
   # test our module
-  - npm test
+  # - npm test
 
 before_script:
   - echo "Publishing native platform Binary Package? ->" $PUBLISH_BINARY
