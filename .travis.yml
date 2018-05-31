@@ -1,0 +1,69 @@
+# First we set up the the type of project, in this case node_js
+language: node_js
+
+# We also need to specify the node.js versions we want to build from,
+# this is important because not all modules work with version 0.11 yet
+# and we want to also create binaries for the different node versions.
+node_js:
+  - '0.10'
+  - '0.11'
+
+# What we'll be using to compile
+compiler: clang
+
+# Here we set up our secure env variables for AS3 publishing.
+env:
+  global:
+  - secure: THE_VERY_LONG_SECURE_KEYS_FOR_PUBLISING
+  - secure: THE_VERY_LONG_SECURE_KEYS_FOR_PUBLISING
+
+
+before_install:
+  # This fixes a problem with apt-get failing later, see http://docs.travis-ci.com/user/installing-dependencies/#Installing-Ubuntu-packages
+  - sudo apt-get update -qq
+  # We install all dependencies for node-opencv using apt-get
+  - sudo apt-get install libcv-dev
+  - sudo apt-get install libopencv-dev
+  - sudo apt-get install libhighgui-dev
+  # Get commit message to check if we should publish binary
+  - COMMIT_MESSAGE=$(git show -s --format=%B $TRAVIS_COMMIT | tr -d '\n')
+  # Put local npm modules .bin on PATH
+  - export PATH=./node_modules/.bin/:$PATH
+  # Install node-gyp and node-pre-gyp so it is available for packaging and publishing
+  - npm install node-gyp -g
+  - npm install node-pre-gyp
+  # Install aws-sdk so it is available for publishing to AS3
+  - npm install aws-sdk
+  # Figure out if we should publish
+  - PUBLISH_BINARY=false
+  # If we are building a tag then we need to publish a new binary package
+  - if [[ $TRAVIS_BRANCH == `git describe --tags --always HEAD` ]]; then PUBLISH_BINARY=true; fi;
+  # or if we put the string [publish binary] in the commit message
+  - if test "${COMMIT_MESSAGE#*'[publish binary]'}" != "$COMMIT_MESSAGE"; then PUBLISH_BINARY=true; fi;
+
+install:
+  # Ensure source install works and compiles correctly
+  - npm install --build-from-source
+  # test our module
+  - npm test
+
+before_script:
+  - echo "Publishing native platform Binary Package? ->" $PUBLISH_BINARY
+  # if we are publishing for this commit, do it
+  - if [[ $PUBLISH_BINARY == true ]]; then node-pre-gyp package publish; fi;
+  # cleanup
+  - node-pre-gyp clean
+  - node-gyp clean
+
+script:
+  # if publishing, test installing from remote
+  - INSTALL_RESULT=0
+  - if [[ $PUBLISH_BINARY == true ]]; then INSTALL_RESULT=$(npm install --fallback-to-build=false > /dev/null)$? || true; fi;
+  # if install returned non zero (errored) then we first unpublish and then call false so travis will bail at this line
+  - if [[ $INSTALL_RESULT != 0 ]]; then echo "returned $INSTALL_RESULT";node-pre-gyp unpublish;false; fi
+  # if success then we arrive here so lets clean up
+  - node-pre-gyp clean
+
+after_success:
+  # if success then query and display all published binaries
+  - node-pre-gyp info
