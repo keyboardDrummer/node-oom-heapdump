@@ -1,3 +1,6 @@
+os:
+  - linux
+
 # First we set up the the type of project, in this case node_js
 language: node_js
 
@@ -5,8 +8,7 @@ language: node_js
 # this is important because not all modules work with version 0.11 yet
 # and we want to also create binaries for the different node versions.
 node_js:
-  - '0.10'
-  - '0.11'
+  - '7'
 
 # What we'll be using to compile
 compiler: clang
